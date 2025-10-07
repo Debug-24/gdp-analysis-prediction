@@ -1,2 +1,1 @@
-# gdp-analysis-prediction
-GDP data analysis and machine learning forecasting project
+"# GDP Analysis and Prediction" 
