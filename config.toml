@@ -1,0 +1,5 @@
+[theme]
+base = "light"
+primaryColor = "#174734"              # University green (sliders, buttons, accents)
+secondaryBackgroundColor = "#fef4eb"  # Soft orange tint for sidebar/cards
+textColor = "#111827"                 # Dark gray text
