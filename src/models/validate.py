@@ -6,7 +6,7 @@ from src.models.utils import metrics_dict, add_adj_r2
 from src.models.compare import TRADITIONAL, ENHANCED
 import warnings
 
-# Suppress warnings for a cleaner output
+# suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 
 def validate_model(df_country: pd.DataFrame, features: list, model_name: str, validation_start_date: str):
@@ -47,7 +47,7 @@ def validate_model(df_country: pd.DataFrame, features: list, model_name: str, va
 
     # calculate performance metrics
     metrics = metrics_dict(y_val, predictions)
-    metrics = add_adj_r2(metrics, n=len(y_val), p=len(features))
+    #metrics = add_adj_r2(metrics, n=len(y_val), p=len(features))
 
     # put into data frame
     output_df = pd.DataFrame({
@@ -58,57 +58,80 @@ def validate_model(df_country: pd.DataFrame, features: list, model_name: str, va
 
     return {"metrics": metrics, "predictions": output_df, "model": model}
 
+if __name__ == '__main__':
+    # file paths
+    processed_data_path = pathlib.Path("data/data-processed/clean_quarterly.csv")
+    summary_metrics_path = pathlib.Path("data/data-processed/summary_metrics.csv")
+    output_path = pathlib.Path("data/data-processed/validation_metrics.csv")
+    output_dir = pathlib.Path("data/data-processed")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-def run_validation_for_country(df: pd.DataFrame, country: str, validation_start_date: str):
-    # filter data for the specified country and drop rows with missing values
-    country_df = df[df["country"] == country].dropna().copy()
+    # load datasets
+    try:
+        full_data = pd.read_csv(processed_data_path, parse_dates=["quarter"])
+        summary_df = pd.read_csv(summary_metrics_path)
+    except FileNotFoundError as e:
+        print(f"\nError: Could not find a required file: {e.filename}")
+        exit()
 
-    if country_df.empty:
-        print(f"No data available for country: {country}")
-        return
+    # --- CONFIGURATION ---
+    VALIDATION_START_DATE = '2020-01-01'  # train on data before this, validate on data after
 
-    print(f"Running Validation for {country} (Validation Period >= {validation_start_date})")
+    validation_results = []
 
-    # go through both traditional and enhanced feature sets
-    for feature_set_label, feature_list in [("Traditional", TRADITIONAL), ("Enhanced", ENHANCED)]:
-        print(f"\n Set: {feature_set_label}")
+    # validate through each best model configuration from the summary file
+    for index, row in summary_df.iterrows():
+        country = row['country']
+        feature_set_label = row['feature_set']
+        winner_model = row['winner_model']
+
+        #print(f"\nValidating for {country} | Feature Set: {feature_set_label} | Best Model: {winner_model}")
+
+        # select the correct feature list based on the label
+        features = ENHANCED if feature_set_label == 'Enhanced' else TRADITIONAL
+
+        # filter data for the specific country and drop rows with missing values
+        country_df = full_data[full_data['country'] == country].copy().dropna()
         
-        # check that features exist
-        features_available = [f for f in feature_list if f in country_df.columns]
-        
+        # check for required features in the dataframe
+        features_available = [f for f in features if f in country_df.columns]
         if not features_available:
-            print("Skipping: None of the required features were found in the data.")
+            print("Skipping: Not all required features were found in the data for this country.")
             continue
 
-        # validate each model type with the current feature set
-        for model_name in ["Linear", "Ridge", "RF"]:
-            print(f"\nValidating Model: {model_name}")
-            result = validate_model(country_df.copy(), features_available, model_name, validation_start_date)
+        # validation with winning model on the specified time split
+        validation_run_result = validate_model(country_df, features_available, winner_model, VALIDATION_START_DATE)
+
+        if validation_run_result:
+            val_metrics = validation_run_result['metrics']
+
+            # dictionary to store comparison results
+            result_row = {
+                'country': country,
+                'feature_set': feature_set_label,
+                'winner_model': winner_model,
+            }
             
-            if result:
-                print("Performance Metrics:")
-                for key, value in result["metrics"].items():
-                    print(f"  {key}: {value:.4f}")
+            # compare original metrics from summary file with new validation metrics
+            for metric in ['RMSE', 'MAE', 'R2', 'AdjR2']:
+                original_metric = row[metric]
+                validation_metric = val_metrics.get(metric)
                 
-                print("\nSample Predictions:")
-                print(result["predictions"].head())
-            else:
-                print(f"Could not complete validation for {model_name} model.")
+                result_row[f'{metric}_original'] = original_metric
+                result_row[f'{metric}_validation'] = validation_metric
+                result_row[f'{metric}_diff'] = validation_metric - original_metric if validation_metric is not None else None
 
+            validation_results.append(result_row)
+            #print(f"Validation finished. RMSE Diff: {result_row['RMSE_diff']:.4f}")
+        else:
+            print("Could not complete validation for this configuration.")
 
-if __name__ == '__main__':
-    try:
-        # load the processed dataset from the data pipeline
-        processed_data_path = pathlib.Path("data/data-processed/clean_quarterly.csv")
-        full_data = pd.read_csv(processed_data_path, parse_dates=["quarter"])
-
-
-        # --- CONFIGURATION ---
-        COUNTRY_TO_VALIDATE = 'United States'
-        VALIDATION_START_DATE = '2020-01-01' # train on data before this, validate on data after
-
-        # run the validation process
-        run_validation_for_country(full_data, COUNTRY_TO_VALIDATE, VALIDATION_START_DATE)
-
-    except FileNotFoundError:
-        print(f"\nError: Processed data file not found at '{processed_data_path}'")
+    # create and save final validation metrics DataFrame
+    if validation_results:
+        validation_df = pd.DataFrame(validation_results)
+        validation_df.to_csv(output_path, index=False)
+        print(f"\nValidation complete. Results saved to {output_path}")
+        print("Sample of validation results:")
+        print(validation_df.head())
+    else:
+        print("\nWarning: No validation results were generated.")
