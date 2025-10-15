@@ -19,7 +19,7 @@ def train_and_eval(df_country: pd.DataFrame, features: list, model_name="Linear"
     if n < 16:
         return None
 
-    train_idx, test_idx = ts_split_indices(n, test_size=8)
+    train_idx, test_idx = ts_split_indices(n, test_size=12)
     Xtr, Xte = X[train_idx], X[test_idx]
     ytr, yte = y[train_idx], y[test_idx]
 

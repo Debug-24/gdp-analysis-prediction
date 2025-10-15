@@ -22,16 +22,16 @@ if __name__ == "__main__":
 
     print(f"Original row count: {len(raw_df)}")
 
-    print("Filtering data to include only records from 2005-01-01 onwards...")
+    #print("Filtering data to include only records from 2005-01-01 onwards...")
 
     raw_df['quarter'] = pd.to_datetime(raw_df['quarter'])
 
-    filtered_df = raw_df[raw_df['quarter'] >= '2005-01-01'].copy()
+    #filtered_df = raw_df[raw_df['quarter'] >= '2005-01-01'].copy()
 
-    print(f"Filtered row count: {len(filtered_df)}")
+    #print(f"Filtered row count: {len(filtered_df)}")
 
     print("\nStarting cleaning pipeline on the filtered data...")
 
-    run(filtered_df, str(out_csv))
+    run(raw_df, str(out_csv))
 
     print(f"\nFiltered and cleaned dataset saved -> {out_csv}")
