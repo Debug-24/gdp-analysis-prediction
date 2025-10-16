@@ -10,9 +10,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import altair as alt
-
-
-
+from data_utils import filter_data
 
 # ---------- Page config ----------
 st.set_page_config(
@@ -24,9 +22,10 @@ st.set_page_config(
 
 # ---------- File locations ----------
 
-MULTI_PATH = Path ("gdp_dataset_for_ml.csv")
-USONLY_PATH = Path ("us_only_data.csv")
-USPRED_PATH = Path("us_gdp_predictors.csv")
+DATA_DIR = Path("data")
+MULTI_PATH = DATA_DIR / "gdp_dataset_for_ml.csv"
+USONLY_PATH = DATA_DIR / "us_only_data.csv"
+USPRED_PATH = DATA_DIR / "us_gdp_predictors.csv"
 
 # ---------- Load Data ----------
 
@@ -143,18 +142,21 @@ tab_overview, tab_model, tab_data = st.tabs(["Overview", "Model Output", "Data"]
 # Overview Tab
 with tab_overview:
     st.subheader("Trend Preview")
-    demo = make_demo_df(*years)
+    if dataset.startswith("Multi-country"):
+        df = load_dataset("multi")
+    else:
+        df = load_dataset("us")
 
-    # Casting Year to string so Streamlit doesn’t add commas
-    demo["Year"] = demo["Year"].astype(str)
+    # Applying filters
+    filtered_df = filter_data(df, country, years[0], years[1])
 
-    chart = alt.Chart(demo).mark_line(color="#174734", strokeWidth=3).encode(
-        x=alt.X("Year", title="Year"),
-        y=alt.Y("GDP (billions, demo)", title="GDP (Billions)")
+    # filtered data for visualization
+    chart = alt.Chart(filtered_df).mark_line(color="#174734", strokeWidth=3).encode(
+        x=alt.X("year:O", title="Year"),
+        y=alt.Y("gross_domestic_product:Q", title="GDP (Billions)")
     )
-
     st.altair_chart(chart, use_container_width=True)
-    st.warning("This is demo data for layout only. Replace with real GDP series from your datasource.")
+    st.dataframe(filtered_df)
 
 # Model Output Tab
 with tab_model:
@@ -179,9 +181,11 @@ with tab_model:
 
 # Data Tab
 with tab_data:
-    st.subheader("Data Table (Demo)")
-    st.dataframe(demo, use_container_width=True)
-    st.info("Replace this table with your datasource ")
+    st.subheader("Filtered Data Table")
+    if "filtered_df" in locals():
+        st.dataframe(filtered_df, use_container_width=True)
+    else:
+        st.info("No data loaded yet. Please select a dataset and filters from the sidebar.")
 
 # ---------- Footer ----------
 st.divider()
