@@ -60,8 +60,8 @@ def load_dataset(which: str) -> pd.DataFrame:
 def get_country_options():
 
     return [
-        "United States","Canada", "Spain", "South Korea","Italy","Turkey","India","Chile","Australia",
-        "Colombia","Hungary","France","Sweden","United Kingdom","Poland", "Germany", "Mexico", "Israel"
+        "United States","Canada", "Spain", "Korea","Italy","Türkiye","Chile","Australia",
+        "Colombia","Hungary","France","Sweden","United Kingdom","Poland", "Germany", "Israel"
     ]
 
 # Demo to keep charts working
@@ -88,8 +88,8 @@ with st.sidebar:
     st.header("Filters")
     if dataset.startswith("Multi-country"):
         country = st.selectbox("Country", [
-            "United States","Canada","Spain","South Korea","Italy","Turkey","India","Chile","Australia",
-            "Colombia","Hungary","France","Sweden","United Kingdom","Poland","Germany","Mexico","Israel"
+            "United States","Canada","Spain","Korea","Italy","Türkiye","Chile","Australia",
+            "Colombia","Hungary","France","Sweden","United Kingdom","Poland","Germany","Israel"
         ], index=0)
     else:
         country = "United States"
