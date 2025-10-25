@@ -6,6 +6,7 @@ metric cards, and tabs. Only included DEMO data.
 """
 import streamlit as st
 from datetime import date
+import plotly.express as px
 import pandas as pd
 import numpy as np
 from pathlib import Path
