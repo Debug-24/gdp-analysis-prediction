@@ -22,14 +22,12 @@ st.set_page_config(
 )
 
 # ---------- File locations ----------
-
 DATA_DIR = Path("data")
 MULTI_PATH = DATA_DIR / "gdp_dataset_for_ml.csv"
 USONLY_PATH = DATA_DIR / "us_only_data.csv"
 USPRED_PATH = DATA_DIR / "us_gdp_predictors.csv"
 
 # ---------- Load Data ----------
-
 @st.cache_data(show_spinner=False)
 def load_dataset(which: str) -> pd.DataFrame:
     if which == "multi":
@@ -114,9 +112,8 @@ with st.sidebar:
 
     run = st.button("Run Prediction")
 
-# ---------- Header ----------
+# Page Header
 st.title("GDP Predictor Tool")
-
 
 # ---------- KPI cards ----------
 c1, c2, c3 = st.columns(3)
@@ -128,8 +125,8 @@ with c2:
 
 st.divider()
 
-# ---------- Tabs ----------
-tab_prediction = st.tabs(["Prediction"])[0]
+# Tabs 
+tab_prediction, tab_features = st.tabs(["Prediction", "Features Ranked"])
 
 # Prediction Tab
 with tab_prediction:
@@ -153,7 +150,7 @@ with tab_prediction:
                     winner_model = best_row["winner_model"]
                     chosen_rmse = best_row["RMSE"]
                 else:
-                    # Use user's explicit selection if available in summary; otherwise still try to load preds file for that feature set
+                    # Use user's selection if available, otherwise attempt to load preds file for that feature set
                     fs_rows = country_rows[country_rows["feature_set"] == feature_set_choice]
                     if not fs_rows.empty:
                         row = fs_rows.iloc[0]
@@ -167,7 +164,7 @@ with tab_prediction:
         except FileNotFoundError:
             st.info(f"Summary metrics file not found at {summary_path}. KPI card will be empty.")
 
-        # --- Load predictions CSV for the chosen feature set ---
+        # Load predictions CSV for the chosen feature set 
         preds_path = None
         preds_df = None
         if chosen_feature_set is not None:
@@ -233,7 +230,77 @@ with tab_prediction:
                 with k3:
                     st.metric("Winner RMSE", f"{chosen_rmse:.2f}" if chosen_rmse is not None else "N/A")
 
+# Features Ranked Tab
+with tab_features:
+    st.subheader("Feature Importance Analysis")
+    
+    # Control for Traditional vs Enhanced features
+    features_type = st.radio(
+        "Feature Set Type",
+        ["Traditional", "Enhanced"],
+        horizontal=True
+    )
+    
+    # Load and process feature importance data for selected country
+    importance_path = Path("data") / "data-processed" / f"importance_{country}_{features_type}.csv"
+    try:
+        importance_df = pd.read_csv(importance_path)
+        
+        # Ensure we have feature and importance columns
+        if not set(["feature", "importance"]).issubset(importance_df.columns):
+            st.error(f"Invalid columns in importance file. Expected 'feature' and 'importance', got: {list(importance_df.columns)}")
+        else:
+            # Sort importance by descending order
+            importance_df = importance_df.sort_values("importance", ascending=True)
+            
+            # Create horizontal bar chart with color coding
+            fig = go.Figure()
+            colors = ['#d73027' if x < 0 else '#1a9850' for x in importance_df['importance']]
+            
+            fig.add_trace(go.Bar(
+                x=importance_df["importance"],
+                y=importance_df["feature"],
+                orientation="h",
+                marker_color=colors,
+                hovertemplate="<b>%{y}</b><br>Importance: %{x:.4f}<extra></extra>"
+            ))
+            
+            fig.update_layout(
+                title=f"Feature Importance Ranking for {country} ({features_type} Features)",
+                xaxis_title="Importance Score",
+                yaxis_title="Feature",
+                height=max(400, len(importance_df) * 30),  
+                margin=dict(l=200),  
+                showlegend=False,
+                # color-coding explanation 
+                annotations=[
+                    dict(
+                        text="Green = Positive Impact | Red = Negative Impact",
+                        xref="paper", yref="paper",
+                        x=0, y=1.05,
+                        showarrow=False,
+                        font=dict(size=10),
+                        xanchor="left"
+                    )
+                ]
+            )
 
-
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Features data table
+            st.subheader("Feature Importance Scores")
+            st.dataframe(
+                importance_df,
+                column_config={
+                    "feature": "Feature Name",
+                    "importance": st.column_config.NumberColumn(
+                        "Importance Score",
+                        format="%.4f",
+                    )
+                },
+                hide_index=True
+            )
+    except FileNotFoundError:
+        st.warning(f"No feature importance data found for {country} with {features_type} features.")
     else:
         st.warning("Click **Run Prediction** after selecting a model to see results.")
