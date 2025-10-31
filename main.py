@@ -228,7 +228,7 @@ with tab_prediction:
                 with k2:
                     st.metric("Feature set", f"{chosen_feature_set}" if chosen_feature_set else "N/A")
                 with k3:
-                    st.metric("Winner RMSE", f"{chosen_rmse:.2f}" if chosen_rmse is not None else "N/A")
+                    st.metric("RMSE", f"{chosen_rmse:.2f}" if chosen_rmse is not None else "N/A")
 
 # Features Ranked Tab
 with tab_features:
