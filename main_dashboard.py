@@ -151,7 +151,47 @@ def load_country_model_df(country: str, feature_set_label: str):
     cdf = cdf[keep_cols].dropna().sort_values("quarter")
     return cdf, feats
 
+# ---- --Standardize Predictions DF (Helper) -------
+def _pick_col(df, exact_names, fuzzy_keywords):
+    lower_map = {c.lower(): c for c in df.columns}
+    for name in exact_names:
+        if name.lower() in lower_map:
+            return lower_map[name.lower()]
+    for c in df.columns:
+        lc = c.lower()
+        if any(k in lc for k in fuzzy_keywords):
+            return c
+    return None
 
+def standardize_preds_df(df):
+    """
+    Returns df with columns standardized to:
+       t, y_true, y_pred
+    """
+    if df is None or df.empty:
+        st.error("Predictions DataFrame is empty.")
+        return pd.DataFrame(columns=["t","y_true","y_pred"])
+
+    t_col = _pick_col(df,
+                      ["quarter", "date", "period", "time", "year", "t", "ds"],
+                      ["quarter", "date", "period", "time", "year"])
+    y_true_col = _pick_col(df,
+                           ["y_true", "y", "actual", "gdp", "target", "truth", "actuals"],
+                           ["true", "actual", "target", "gdp"])
+    y_pred_col = _pick_col(df,
+                           ["y_pred", "yhat", "prediction", "pred", "forecast", "predicted", "gdp_pred"],
+                           ["pred", "forecast", "yhat"])
+
+    missing = []
+    if t_col is None: missing.append("time axis (e.g. 'quarter'/'date')")
+    if y_true_col is None: missing.append("actuals (e.g. 'y_true'/'actual')")
+    if y_pred_col is None: missing.append("predictions (e.g. 'y_pred'/'yhat')")
+    if missing:
+        st.error(f"Missing: {', '.join(missing)}. Columns found: {list(df.columns)}")
+        return pd.DataFrame(columns=["t","y_true","y_pred"])
+
+    out = df.rename(columns={t_col: "t", y_true_col: "y_true", y_pred_col: "y_pred"}).copy()
+    return out[["t", "y_true", "y_pred"]]
 
 
 @st.cache_data(show_spinner=False)
@@ -251,7 +291,7 @@ def load_dataset(which: str) -> pd.DataFrame:
 def get_country_options():
 
     return [
-        "United States","Canada", "Spain", "South Korea","Italy","Turkey","India","Chile","Australia",
+        "United States","Canada", "Spain", "South Korea","Italy","Türkiye","India","Chile","Australia",
         "Colombia","Hungary","France","Sweden","United Kingdom","Poland", "Germany", "Mexico", "Israel"
     ]
 
@@ -280,7 +320,7 @@ with st.sidebar:
     st.header("Filters")
     if dataset.startswith("Multi-country"):
         country = st.selectbox("Country", [
-            "United States","Canada","Spain","South Korea","Italy","Turkey","India","Chile","Australia",
+            "United States","Canada","Spain","South Korea","Italy","Türkiye","India","Chile","Australia",
             "Colombia","Hungary","France","Sweden","United Kingdom","Poland","Germany","Mexico","Israel"
         ], index=0)
     else:
@@ -333,19 +373,41 @@ tab_overview, tab_model, tab_data = st.tabs(["Overview", "Model Output", "Data"]
 
 # --Overview Tab
 with tab_overview:
-    st.subheader("Trend Preview")
-    demo = make_demo_df(*years)
+    st.subheader("Trend Preview (Actuals)")
 
-    # Casting Year to string so Streamlit doesn’t add commas
-    demo["Year"] = demo["Year"].astype(str)
+    preds_raw, _ = load_preds(country, feature_set_label)
+    preds_std = standardize_preds_df(preds_raw)
 
-    chart = alt.Chart(demo).mark_line(color="#174734", strokeWidth=3).encode(
-        x=alt.X("Year", title="Year"),
-        y=alt.Y("GDP (billions, demo)", title="GDP (Billions)")
-    )
+    if preds_std.empty:
+        st.info("No predictions/actuals file found yet for this selection. Run a forecast or check data-processed.")
+    else:
+        df_plot = preds_std.copy()
+        try:
+            t_parsed = pd.to_datetime(df_plot["t"], errors="coerce")
+            mask = (t_parsed.dt.year >= years[0]) & (t_parsed.dt.year <= years[1])
+            if mask.notna().any():
+                df_plot = df_plot[mask.fillna(False)]
+        except Exception:
+            pass
 
-    st.altair_chart(chart, use_container_width=True)
-   # st.warning
+        # Plot actuals only (change to ["y_true","y_pred"] to plot both)
+        long_df = df_plot.melt(
+            id_vars=["t"], value_vars=["y_true"],
+            var_name="series", value_name="value"
+        )
+
+        chart = (
+            alt.Chart(long_df)
+            .mark_line(point=True)
+            .encode(
+                x=alt.X("t:O", title="Time"),
+                y=alt.Y("value:Q", title="GDP (Actual)"),
+                tooltip=["t", "value"]
+            )
+            .properties(height=380)
+        )
+        st.altair_chart(chart, use_container_width=True)
+    
 
 # --Model Output Tab
 with tab_model:
@@ -373,67 +435,64 @@ with tab_model:
     else:
         top_k = st.slider("Top features to display", 5, 30, 10)
         plot_df = imp_df.sort_values("importance", ascending=False).head(top_k)
+
+        friendly_names = {
+            "grossfixedcapitalformation": "Investment",
+            "fixedcapitalformation": "Investment",
+            "gfcf": "Investment",
+            "investment": "Investment",
+
+            "tradebalance": "Trade Balance",
+            "consumerpriceindex": "CPI",
+            "cpi": "CPI",
+
+            "unemploymentrate": "Unemployment",
+            "unemployment": "Unemployment",
+
+            "consumption": "Consumption",
+            "governmentexpenditure": "Government Spending",
+            "governmentspending": "Government Spending",
+            "government_spending": "Government Spending",
+            "exports": "Exports",
+            "imports": "Imports",
+        }
+
+        # Normalize a key for lookup, then map to friendly label
+        plot_df["__key"] = (
+            plot_df["feature"]
+            .astype(str)
+            .str.replace(r"[\s_]+", "", regex=True)
+            .str.lower()
+        )
+        plot_df["feature_ui"] = plot_df["__key"].map(friendly_names).fillna(plot_df["feature"])
+
+        #For labels not to get cut
+        row_height = 40  # maybe 36–44 for tighter
+        chart_height = max(row_height * len(plot_df), 200)
         chart = (
             alt.Chart(plot_df)
             .mark_bar()
             .encode(
                 x=alt.X("importance:Q", title="Importance"),
-                y=alt.Y("feature:N", sort="-x", title="Feature"),
-                tooltip=["feature", "importance"]
-            )
-            .properties(height=28 * len(plot_df))
+                y=alt.Y("feature_ui:N", sort='-x', title="Feature", axis=alt.Axis(labelLimit=220)),
+                tooltip=["feature_ui:N", "importance:Q"]
         )
+    .properties(height=chart_height)
+)
+        
         st.altair_chart(chart, use_container_width=True)
 
     st.divider()
-    # ---- --Standardize Predictions DF (Helper) -------
-def _pick_col(df, exact_names, fuzzy_keywords):
-    lower_map = {c.lower(): c for c in df.columns}
-    for name in exact_names:
-        if name.lower() in lower_map:
-            return lower_map[name.lower()]
-    for c in df.columns:
-        lc = c.lower()
-        if any(k in lc for k in fuzzy_keywords):
-            return c
-    return None
-
-def standardize_preds_df(df):
-    """
-    Returns df with columns standardized to:
-       t, y_true, y_pred
-    """
-    if df is None or df.empty:
-        st.error("Predictions DataFrame is empty.")
-        return pd.DataFrame(columns=["t","y_true","y_pred"])
-
-    t_col = _pick_col(df,
-                      ["quarter", "date", "period", "time", "year", "t", "ds"],
-                      ["quarter", "date", "period", "time", "year"])
-    y_true_col = _pick_col(df,
-                           ["y_true", "y", "actual", "gdp", "target", "truth", "actuals"],
-                           ["true", "actual", "target", "gdp"])
-    y_pred_col = _pick_col(df,
-                           ["y_pred", "yhat", "prediction", "pred", "forecast", "predicted", "gdp_pred"],
-                           ["pred", "forecast", "yhat"])
-
-    missing = []
-    if t_col is None: missing.append("time axis (e.g. 'quarter'/'date')")
-    if y_true_col is None: missing.append("actuals (e.g. 'y_true'/'actual')")
-    if y_pred_col is None: missing.append("predictions (e.g. 'y_pred'/'yhat')")
-    if missing:
-        st.error(f"Missing: {', '.join(missing)}. Columns found: {list(df.columns)}")
-        return pd.DataFrame(columns=["t","y_true","y_pred"])
-
-    out = df.rename(columns={t_col: "t", y_true_col: "y_true", y_pred_col: "y_pred"}).copy()
-    return out[["t", "y_true", "y_pred"]]
-
+    
 
     # -------- Predictions vs Actual Chart --------
     st.markdown("### Predictions vs Actual")
 
-    preds_df = load_preds(country, feature_set_label)   
-    preds_df_std = standardize_preds_df(preds_df)
+    # UNPACK: load_preds returns (df, time_col)
+    preds_raw, _ = load_preds(country, feature_set_label)
+
+    # Standardize to columns t, y_true, y_pred
+    preds_df_std = standardize_preds_df(preds_raw)
 
     if preds_df_std.empty:
         st.info(f"No prediction file found or missing columns for {country} - {feature_set_label}")
@@ -442,7 +501,6 @@ def standardize_preds_df(df):
             id_vars=["t"], value_vars=["y_true", "y_pred"],
             var_name="series", value_name="value"
         )
-
         line = (
             alt.Chart(long_df)
             .mark_line(point=True)
@@ -510,7 +568,22 @@ def standardize_preds_df(df):
 # --Data Tab
 with tab_data:
     st.subheader("Data Table")
-    st.dataframe(demo, use_container_width=True)
+
+    view = st.radio("Choose table", ["Predictions (Actuals + Preds)", "Summary Metrics"], horizontal=True)
+
+    if view == "Predictions (Actuals + Preds)":
+        preds_raw, _ = load_preds(country, feature_set_label)
+        preds_std = standardize_preds_df(preds_raw)
+        if preds_std.empty:
+            st.info("No predictions/actuals found for this selection.")
+        else:
+            st.dataframe(preds_std, use_container_width=True)
+    else:
+        summary_df = load_summary(SUMMARY_PATH)
+        if summary_df.empty:
+            st.info("summary_metrics.csv not found or empty.")
+        else:
+            st.dataframe(summary_df, use_container_width=True)
     
 
 # ---------- Footer ----------
