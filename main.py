@@ -23,17 +23,13 @@ st.set_page_config(
 
 # ---------- File locations ----------
 DATA_DIR = Path("data")
-MULTI_PATH = DATA_DIR / "gdp_dataset_for_ml.csv"
-USONLY_PATH = DATA_DIR / "us_only_data.csv"
-USPRED_PATH = DATA_DIR / "us_gdp_predictors.csv"
+DATASET_PATH = DATA_DIR / "gdp_dataset_for_ml.csv"
 
 # ---------- Load Data ----------
 @st.cache_data(show_spinner=False)
-def load_dataset(which: str) -> pd.DataFrame:
-    if which == "multi":
-        df = pd.read_csv(MULTI_PATH)
-    else:
-        df = pd.read_csv(USONLY_PATH)
+def load_dataset() -> pd.DataFrame:
+    """Load and preprocess the GDP dataset"""
+    df = pd.read_csv(DATASET_PATH)
 
     # Parse quarter column
     q = df["quarter"].astype(str)
@@ -69,29 +65,16 @@ def make_demo_df(start_year: int, end_year: int, seed: int = 7) -> pd.DataFrame:
     base = np.linspace(1000, 2000, len(years)) + rng.normal(0, 50, len(years)).cumsum()
     return pd.DataFrame({"Year": years, "GDP (billions, demo)": np.round(base, 2)})
 
-# ---------- Sidebar : Data & Controls ----------
-# Dataset switcher 
+# ---------- Sidebar : Filters & Controls ----------
 with st.sidebar:
     st.header("Data Source")
-    dataset = st.radio(
-        "Choose dataset",
-        [
-            "Multi-country GDP (gdp_dataset_for_ml.csv)",
-            "US-only GDP (us_only_data.csv)",
-            "US GDP + Predictors (us_gdp_predictors.csv)"
-        ],
-        index=0
-    )
+    st.info("Multi-country GDP Dataset (gdp_dataset_for_ml.csv)")
 
     st.header("Filters")
-    if dataset.startswith("Multi-country"):
-        country = st.selectbox("Country", [
-            "United States","Canada","Spain","Korea","Italy","Türkiye","Chile","Australia",
-            "Colombia","Hungary","France","Sweden","United Kingdom","Poland","Germany","Israel"
-        ], index=0)
-    else:
-        country = "United States"
-        st.text_input("Country", value=country, disabled=True)
+    country = st.selectbox("Country", [
+        "United States","Canada","Spain","Korea","Italy","Türkiye","Chile","Australia",
+        "Colombia","Hungary","France","Sweden","United Kingdom","Poland","Germany","Israel"
+    ], index=0)
 
     year_min, year_max_default = 1990, date.today().year
     years = st.slider("Timeline (Years)", min_value=year_min, max_value=year_max_default, value=(2010, year_max_default))
@@ -102,13 +85,7 @@ with st.sidebar:
         index=0
     )
 
-    if dataset.startswith("US GDP + Predictors"):
-        use_predictors = st.checkbox("Use predictor variables (X)", value=True)
-        selected_predictors = st.multiselect(
-            "Select predictors",
-            ["unemployment_rate", "cpi_or_inflation", "interest_rate"],
-            default=["unemployment_rate", "cpi_or_inflation"]
-        )
+
 
     run = st.button("Run Prediction")
 
