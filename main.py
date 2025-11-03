@@ -9,7 +9,6 @@ from datetime import date
 import pandas as pd
 import numpy as np
 from pathlib import Path
-import altair as alt
 from data_utils import filter_data
 import plotly.graph_objects as go
 
