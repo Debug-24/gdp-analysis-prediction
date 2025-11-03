@@ -56,8 +56,12 @@ with st.sidebar:
 
     st.header("Filters")
     country = st.selectbox("Country", [
-        "United States","Canada","Spain","Korea","Italy","Türkiye","Chile","Australia",
-        "Colombia","Hungary","France","Sweden","United Kingdom","Poland","Germany","Israel"
+        "Australia", "Austria", "Belgium", "Bulgaria", "Canada", "Chile", "Colombia",
+        "Costa Rica", "Croatia", "Czechia", "Denmark", "Estonia", "Finland", "France",
+        "Germany", "Greece", "Hungary", "Iceland", "Ireland", "Israel", "Italy", "Japan",
+        "Korea", "Latvia", "Lithuania", "Luxembourg", "Netherlands", "Norway", "Poland",
+        "Portugal", "Slovak Republic", "Slovenia", "Spain", "Sweden", "Türkiye",
+        "United Kingdom", "United States"
     ], index=0)
 
     year_min, year_max_default = 1990, date.today().year
@@ -68,8 +72,6 @@ with st.sidebar:
         ["Auto (best)", "Traditional", "Enhanced"],
         index=0
     )
-
-
 
     run = st.button("Run Prediction")
 
@@ -233,7 +235,7 @@ with tab_features:
                 height=max(400, len(importance_df) * 30),  
                 margin=dict(l=200),  
                 showlegend=False,
-                # color-coding explanation 
+                # color-coding
                 annotations=[
                     dict(
                         text="Green = Positive Impact | Red = Negative Impact",
