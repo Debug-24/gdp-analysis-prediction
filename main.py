@@ -49,21 +49,6 @@ def load_dataset() -> pd.DataFrame:
     df = df.dropna(subset=["country", "year", "gross_domestic_product"])
     return df
 
-# ---------- Helper functions  ----------
-def get_country_options():
-
-    return [
-        "United States","Canada", "Spain", "Korea","Italy","Türkiye","Chile","Australia",
-        "Colombia","Hungary","France","Sweden","United Kingdom","Poland", "Germany", "Israel"
-    ]
-
-# Demo to keep charts working
-def make_demo_df(start_year: int, end_year: int, seed: int = 7) -> pd.DataFrame:
-    years = list(range(start_year, end_year + 1))
-    rng = np.random.default_rng(seed)
-    base = np.linspace(1000, 2000, len(years)) + rng.normal(0, 50, len(years)).cumsum()
-    return pd.DataFrame({"Year": years, "GDP (billions, demo)": np.round(base, 2)})
-
 # ---------- Sidebar : Filters & Controls ----------
 with st.sidebar:
     st.header("Data Source")
