@@ -94,7 +94,10 @@ tab_prediction, tab_features = st.tabs(["Prediction", "Features Ranked"])
 # Prediction Tab
 with tab_prediction:
     st.subheader("Prediction")
-    if run:
+    
+    if not run:
+        st.info("**Please select a country from the sidebar and click 'Run Prediction' to see the GDP prediction results and visualization.**")
+    else:
         st.success(f"Generating prediction chart for {country} on {years[0]}–{years[1]}.")
 
         # --- Load summary metrics to find the winning feature set/model for this country ---
@@ -265,5 +268,4 @@ with tab_features:
             )
     except FileNotFoundError:
         st.warning(f"No feature importance data found for {country} with {features_type} features.")
-    else:
-        st.warning("Click **Run Prediction** after selecting a model to see results.")
+
