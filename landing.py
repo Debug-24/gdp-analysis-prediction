@@ -225,7 +225,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 if middle.button("Launch Dashboard"):
-    st.switch_page("pages/main_dashboard.py")
+    st.switch_page("pages/main.py")
 
 
 # ---------------- Features ----------------

@@ -11,6 +11,7 @@ import altair as alt
 import glob
 import re
 import sys
+from src.models.predict import generate_forecast, TRADITIONAL, ENHANCED
 
 # ---------- Page config ----------
 st.set_page_config(
@@ -44,8 +45,6 @@ SCRIPTS_DIR = ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-# Import forecast function from your ML pipeline
-from scripts.models.predict import generate_forecast, TRADITIONAL, ENHANCED
 
 DATA_DIR = ROOT / "data" / "data-processed"
 
@@ -306,26 +305,12 @@ def make_demo_df(start_year: int, end_year: int, seed: int = 7) -> pd.DataFrame:
 # Dataset switcher -  Optional (?)
 # ---------- Sidebar : Data & Controls ----------
 with st.sidebar:
-    st.header("Data Source")
-    dataset = st.radio(
-        "Choose dataset",
-        [
-            "Multi-country GDP",
-            "US-only GDP ",
-            "US GDP + Predictors "
-        ],
-        index=0
-    )
-
     st.header("Filters")
-    if dataset.startswith("Multi-country"):
-        country = st.selectbox("Country", [
-            "United States","Canada","Spain","South Korea","Italy","Türkiye","India","Chile","Australia",
-            "Colombia","Hungary","France","Sweden","United Kingdom","Poland","Germany","Mexico","Israel"
-        ], index=0)
-    else:
-        country = "United States"
-        st.text_input("Country", value=country, disabled=True)
+    country = st.selectbox("Country", [
+        "United States","Canada","Spain","South Korea","Italy","Türkiye","India","Chile","Australia",
+        "Colombia","Hungary","France","Sweden","United Kingdom","Poland","Germany","Mexico","Israel"
+    ], index=0)
+
 
     year_min, year_max_default = 1990, date.today().year
     years = st.slider("Timeline (Years)",
@@ -516,7 +501,7 @@ with tab_model:
     
     #------------Forecast Chart-----------
     st.divider()
-    st.markdown("### Forecast (Using Best Config)")
+   
 
     if run:
         try:
@@ -541,18 +526,6 @@ with tab_model:
 
                 viz = pd.concat([hist, fore], ignore_index=True)
 
-                line = (
-                    alt.Chart(viz)
-                    .mark_line(point=True)
-                    .encode(
-                        x=alt.X("quarter:T", title="Quarter"),
-                        y=alt.Y("value:Q", title="GDP"),
-                        color="type:N",
-                        tooltip=["quarter:T", "type:N", "value:Q"]
-                    )
-                    .properties(height=380)
-                )
-                st.altair_chart(line, use_container_width=True)
 
                 with st.expander("Details", expanded=False):
                     st.write(f"Winner model: **{winner_model}** · Feature set: **{feature_set_label}**")
