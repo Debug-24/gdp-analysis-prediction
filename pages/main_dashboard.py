@@ -343,7 +343,14 @@ with st.sidebar:
 
     st.header("Forecast")
     horizon = st.slider("Forecast quarters", 1, 20, 8)   
-    run = st.button("Run")
+
+    feature_set_choice = st.selectbox(
+        "Features Set to display",
+        ["Auto (best)", "Traditional", "Enhanced"],
+        index=0
+    )
+
+    run = st.button("Run Prediction")
 
 
 # ---------- Header ----------
@@ -362,44 +369,163 @@ with c3:
 st.divider()
 
 # ---------- Tabs ----------
-tab_overview, tab_model, tab_data = st.tabs(["Overview", "Model Output", "Data"])
+tab_prediction, tab_model, tab_data = st.tabs(["Prediction", "Model Output", "Data"])
 
-# --Overview Tab
-with tab_overview:
-    st.subheader("Trend Preview (Actuals)")
-
-    preds_raw, _ = load_preds(country, feature_set_label)
-    preds_std = standardize_preds_df(preds_raw)
-
-    if preds_std.empty:
-        st.info("No predictions/actuals file found yet for this selection. Run a forecast or check data-processed.")
+# Prediction Tab
+with tab_prediction:
+    st.subheader("Prediction")
+    
+    if not run:
+        st.info("**Please select a country from the sidebar and click 'Run Prediction' to see the GDP prediction results and visualization.**")
     else:
-        df_plot = preds_std.copy()
+        st.success(f"Generating prediction chart for {country} on {years[0]}–{years[1]}.")
+
+        # --- Load summary metrics to find the winning feature set/model for this country ---
+        summary_path = Path("data") / "data-processed" / "summary_metrics.csv"
+        winner_model = None
+        chosen_feature_set = None
+        chosen_rmse = None
         try:
-            t_parsed = pd.to_datetime(df_plot["t"], errors="coerce")
-            mask = (t_parsed.dt.year >= years[0]) & (t_parsed.dt.year <= years[1])
-            if mask.notna().any():
-                df_plot = df_plot[mask.fillna(False)]
-        except Exception:
-            pass
+            summary_df = pd.read_csv(summary_path)
+            country_rows = summary_df[summary_df["country"] == country]
+            if not country_rows.empty:
+                # If user chooses Auto, choose the best feature set by RMSE
+                if feature_set_choice == "Auto (best)":
+                    best_row = country_rows.loc[country_rows["RMSE"].idxmin()]
+                    chosen_feature_set = best_row["feature_set"]
+                    winner_model = best_row["winner_model"]
+                    chosen_rmse = best_row["RMSE"]
+                else:
+                    # Use user's selection if available, otherwise attempt to load preds file for that feature set
+                    fs_rows = country_rows[country_rows["feature_set"] == feature_set_choice]
+                    if not fs_rows.empty:
+                        row = fs_rows.iloc[0]
+                        chosen_feature_set = row["feature_set"]
+                        winner_model = row["winner_model"]
+                        chosen_rmse = row["RMSE"]
+                    else:
+                        chosen_feature_set = feature_set_choice
+            else:
+                st.info(f"No summary metrics found for {country} in {summary_path}.")
+        except FileNotFoundError:
+            st.info(f"Summary metrics file not found at {summary_path}. KPI card will be empty.")
 
-        # Plot actuals only (change to ["y_true","y_pred"] to plot both)
-        long_df = df_plot.melt(
-            id_vars=["t"], value_vars=["y_true"],
-            var_name="series", value_name="value"
-        )
+        # Load predictions CSV for the chosen feature set 
+        preds_path = None
+        preds_df = None
+        if chosen_feature_set is not None:
+            preds_path = Path("data") / "data-processed" / f"preds_{country}_{chosen_feature_set}.csv"
+            if preds_path.exists():
+                preds_df = pd.read_csv(preds_path, parse_dates=["quarter"]) 
+            else:
+                for alt_fs in ["Traditional", "Enhanced"]:
+                    alt_path = Path("data") / "data-processed" / f"preds_{country}_{alt_fs}.csv"
+                    if alt_path.exists():
+                        preds_df = pd.read_csv(alt_path, parse_dates=["quarter"])
+                        preds_path = alt_path
+                        break
 
-        chart = (
-            alt.Chart(long_df)
-            .mark_line(point=True)
-            .encode(
-                x=alt.X("t:O", title="Time"),
-                y=alt.Y("value:Q", title="GDP (Actual)"),
-                tooltip=["t", "value"]
-            )
-            .properties(height=380)
-        )
-        st.altair_chart(chart, use_container_width=True)
+        if preds_df is None:
+            st.warning(f"No prediction file found for {country}. Expected at preds_{country}_<FeatureSet>.csv in data/data-processed.")
+        else:
+            # Ensure columns present
+            if not set(["quarter", "GDP_actual", "GDP_pred"]).issubset(preds_df.columns):
+                st.error(f"Predictions file {preds_path} missing required columns. Found: {list(preds_df.columns)}")
+            else:
+                # Filter by selected years
+                start_dt = pd.to_datetime(f"{years[0]}-01-01")
+                end_dt = pd.to_datetime(f"{years[1]}-12-31")
+                mask = (preds_df["quarter"] >= start_dt) & (preds_df["quarter"] <= end_dt)
+                plot_df = preds_df.loc[mask].copy()
+
+                # Plotly figure with two lines
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=plot_df["quarter"],
+                    y=plot_df["GDP_actual"],
+                    mode="lines+markers",
+                    name="GDP Actual",
+                    line=dict(color="#174734")
+                ))
+                fig.add_trace(go.Scatter(
+                    x=plot_df["quarter"],
+                    y=plot_df["GDP_pred"],
+                    mode="lines+markers",
+                    name="GDP Predicted",
+                    line=dict(color="#e87503", dash="dash")
+                ))
+
+                fig.update_layout(
+                    title=f"{country}: Actual vs Predicted GDP ({chosen_feature_set if chosen_feature_set else 'unknown feature set'})",
+                    xaxis_title="Date",
+                    yaxis_title="GDP (Billions)",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
+                # KPI / summary display
+                k1, k2, k3 = st.columns(3)
+                with k1:
+                    if winner_model:
+                        st.metric("Winning model", f"{winner_model}")
+                    else:
+                        st.metric("Winning model", "N/A")
+                with k2:
+                    st.metric("Feature set", f"{chosen_feature_set}" if chosen_feature_set else "N/A")
+                with k3:
+                    st.metric("RMSE", f"{chosen_rmse:.2f}" if chosen_rmse is not None else "N/A")
+                    
+        #------------Forecast Chart-----------
+        st.divider()
+        st.markdown("### Forecast (Using Best Config)")
+
+        if run:
+            try:
+                # Build the modeling dataframe for the selected country + feature set
+                country_df, used_feats = load_country_model_df(country, feature_set_label)
+                if country_df.empty or "GDP" not in country_df.columns:
+                    st.warning("Modeling data not available or GDP column missing. Check data/data-processed/clean_quarterly.csv.")
+                else:
+                    df_fore = generate_forecast(
+                        model_name=winner_model,
+                        country_df=country_df,
+                        feature_set_label=feature_set_label,
+                        future_quarters=horizon
+                    )
+
+                    # Merge historical + forecast for one visual
+                    hist = country_df[["quarter", "GDP"]].rename(columns={"GDP": "value"})
+                    hist["type"] = "Historical"
+
+                    fore = df_fore.rename(columns={"GDP_pred": "value"})
+                    fore["type"] = "Forecast"
+
+                    viz = pd.concat([hist, fore], ignore_index=True)
+
+                    line = (
+                        alt.Chart(viz)
+                        .mark_line(point=True)
+                        .encode(
+                            x=alt.X("quarter:T", title="Quarter"),
+                            y=alt.Y("value:Q", title="GDP"),
+                            color="type:N",
+                            tooltip=["quarter:T", "type:N", "value:Q"]
+                        )
+                        .properties(height=380)
+                    )
+                    st.altair_chart(line, use_container_width=True)
+
+                    with st.expander("Details", expanded=False):
+                        st.write(f"Winner model: **{winner_model}** · Feature set: **{feature_set_label}**")
+                        st.write("Features used:", used_feats)
+                        st.dataframe(df_fore, use_container_width=True)
+
+            except Exception as e:
+                st.error(f"Forecast failed: {e}")
+        else:
+            st.caption("Set a horizon and click **Run** to produce future quarters.")
+                
     
 
 # --Model Output Tab
@@ -507,55 +633,7 @@ with tab_model:
         )
         st.altair_chart(line, use_container_width=True)
     
-    #------------Forecast Chart-----------
-    st.divider()
-    st.markdown("### Forecast (Using Best Config)")
-
-    if run:
-        try:
-            # Build the modeling dataframe for the selected country + feature set
-            country_df, used_feats = load_country_model_df(country, feature_set_label)
-            if country_df.empty or "GDP" not in country_df.columns:
-                st.warning("Modeling data not available or GDP column missing. Check data/data-processed/clean_quarterly.csv.")
-            else:
-                df_fore = generate_forecast(
-                    model_name=winner_model,
-                    country_df=country_df,
-                    feature_set_label=feature_set_label,
-                    future_quarters=horizon
-                )
-
-                # Merge historical + forecast for one visual
-                hist = country_df[["quarter", "GDP"]].rename(columns={"GDP": "value"})
-                hist["type"] = "Historical"
-
-                fore = df_fore.rename(columns={"GDP_pred": "value"})
-                fore["type"] = "Forecast"
-
-                viz = pd.concat([hist, fore], ignore_index=True)
-
-                line = (
-                    alt.Chart(viz)
-                    .mark_line(point=True)
-                    .encode(
-                        x=alt.X("quarter:T", title="Quarter"),
-                        y=alt.Y("value:Q", title="GDP"),
-                        color="type:N",
-                        tooltip=["quarter:T", "type:N", "value:Q"]
-                    )
-                    .properties(height=380)
-                )
-                st.altair_chart(line, use_container_width=True)
-
-                with st.expander("Details", expanded=False):
-                    st.write(f"Winner model: **{winner_model}** · Feature set: **{feature_set_label}**")
-                    st.write("Features used:", used_feats)
-                    st.dataframe(df_fore, use_container_width=True)
-
-        except Exception as e:
-            st.error(f"Forecast failed: {e}")
-    else:
-        st.caption("Set a horizon and click **Run** to produce future quarters.")
+    
 
 
 # --Data Tab
