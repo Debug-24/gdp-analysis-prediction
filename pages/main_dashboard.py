@@ -22,18 +22,212 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ---- Custom CSS to resize metric text ----
+# ---- Custom CSS Styling ----
 st.markdown("""
 <style>
+/* Metric styling */
 div[data-testid="stMetricValue"] {
-    font-size: 18px !important;
-    font-weight: 600;
+    font-size: 24px !important;
+    font-weight: 700;
+    color: #174734;
 }
 div[data-testid="stMetricLabel"] {
     font-size: 12px !important;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #888;
+    letter-spacing: 0.1em;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+/* Button styling */
+.stButton>button {
+    background: linear-gradient(90deg, #174734 0%, #2d5a47 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1.5rem;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(23, 71, 52, 0.2);
+    width: 100%;
+}
+
+.stButton>button:hover {
+    background: linear-gradient(90deg, #2d5a47 0%, #174734 100%);
+    box-shadow: 0 4px 8px rgba(23, 71, 52, 0.3);
+    transform: translateY(-1px);
+}
+
+/* Sidebar styling */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #e8f4f0 0%, #d0e7df 100%);
+    color: #2d1810;
+}
+
+section[data-testid="stSidebar"] .element-container {
+    padding: 0.5rem 0;
+}
+
+section[data-testid="stSidebar"] h3 {
+    color: #174734;
+    font-weight: 700;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+    border-bottom: 2px solid #8b6f47;
+    padding-bottom: 0.5rem;
+}
+
+/* Form controls in sidebar with semi-transparent white background for readability */
+section[data-testid="stSidebar"] .stSelectbox,
+section[data-testid="stSidebar"] .stSlider,
+section[data-testid="stSidebar"] .stRadio,
+section[data-testid="stSidebar"] .stInfo,
+section[data-testid="stSidebar"] .stSuccess,
+section[data-testid="stSidebar"] .stWarning {
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 6px;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Tab styling */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+    background-color: #f9fafb;
+    padding: 8px;
+    border-radius: 8px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: #174734;
+    color: white;
+}
+
+.stTabs [aria-selected="false"] {
+    background-color: white;
+    color: #374151;
+}
+
+.stTabs [aria-selected="false"]:hover {
+    background-color: #e5e7eb;
+}
+
+/* Card/Container styling */
+div[data-testid="stHorizontalBlock"] {
+    gap: 1rem;
+}
+
+/* Info/Success/Warning boxes */
+.stInfo {
+    background-color: #eff6ff;
+    border-left: 4px solid #3b82f6;
+}
+
+.stSuccess {
+    background-color: #f0fdf4;
+    border-left: 4px solid #22c55e;
+}
+
+.stWarning {
+    background-color: #fffbeb;
+    border-left: 4px solid #f59e0b;
+}
+
+.stError {
+    background-color: #fef2f2;
+    border-left: 4px solid #ef4444;
+}
+
+/* Selectbox and input styling */
+.stSelectbox label, .stSlider label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 14px;
+}
+
+/* Radio button styling */
+.stRadio [role="radiogroup"] {
+    gap: 1rem;
+    padding: 0.5rem;
+    background-color: white;
+    border-radius: 6px;
+}
+
+/* Divider styling */
+hr {
+    border: none;
+    border-top: 2px solid #e5e7eb;
+    margin: 1.5rem 0;
+}
+
+
+/* Title styling */
+h1 {
+    color: #174734;
+    font-weight: 800;
+    margin-bottom: 1rem;
+}
+
+h2 {
+    color: #1f2937;
+    font-weight: 700;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+h3 {
+    color: #374151;
+    font-weight: 600;
+    margin-top: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+/* Chart container */
+.plotly {
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    background: white;
+}
+
+/* Dataframe styling */
+.dataframe {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Expander styling */
+.streamlit-expanderHeader {
+    font-weight: 600;
+    color: #174734;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #174734;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #2d5a47;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -249,8 +443,6 @@ def load_css(path: str = "styles.css"):
     p = Path(path)
     if p.exists():
         st.markdown(f"<style>{p.read_text()}</style>", unsafe_allow_html=True)
-    else:
-        st.caption(f"Tip: Add a `{path}` file for custom styling.")
 
 load_css()
 
@@ -259,7 +451,7 @@ load_css()
 
 # Updated paths to use ROOT variable (file is now in pages/ directory)
 DATA_RAW_DIR = ROOT / "data" / "data-raw"
-DATASET_PATH = DATA_DIR / "gdp_dataset_for_ml.csv"
+DATASET_PATH = DATA_RAW_DIR / "gdp_dataset_for_ml.csv"
 
 
 # ---------- Load Data ----------
@@ -326,9 +518,9 @@ with st.sidebar:
         winner_model = best.get("winner_model", "RandomForest")              # "Linear" | "Ridge" | "RandomForest"
         st.success(f"Best Set: {feature_set_label}")
     else:
-        st.warning("summary_metrics.csv didn't have a row for this country. Choose manually.")
-        feature_set_label = st.selectbox("Feature Set", ["Enhanced", "Traditional"], index=0)
-        winner_model = st.selectbox("Model", ["RandomForest", "Ridge", "Linear"], index=0)
+        st.warning("summary_metrics.csv didn't have a row for this country. Using default.")
+        feature_set_label = "Enhanced"  # Default fallback
+        winner_model = "RandomForest"  # Default fallback
 
     model_label = f"{feature_set_label} · {winner_model}"
 
@@ -361,7 +553,7 @@ with tab_prediction:
         st.success(f"Generating prediction chart for {country} on {years[0]}–{years[1]}.")
 
         # --- Load summary metrics to find the winning feature set/model for this country ---
-        summary_path = Path("data") / "data-processed" / "summary_metrics.csv"
+        summary_path = SUMMARY_PATH
         winner_model = None
         chosen_feature_set = None
         chosen_rmse = None
@@ -394,19 +586,19 @@ with tab_prediction:
         preds_path = None
         preds_df = None
         if chosen_feature_set is not None:
-            preds_path = Path("data") / "data-processed" / f"preds_{country}_{chosen_feature_set}.csv"
+            preds_path = DATA_DIR / f"preds_{country}_{chosen_feature_set}.csv"
             if preds_path.exists():
                 preds_df = pd.read_csv(preds_path, parse_dates=["quarter"]) 
             else:
                 for alt_fs in ["Traditional", "Enhanced"]:
-                    alt_path = Path("data") / "data-processed" / f"preds_{country}_{alt_fs}.csv"
+                    alt_path = DATA_DIR / f"preds_{country}_{alt_fs}.csv"
                     if alt_path.exists():
                         preds_df = pd.read_csv(alt_path, parse_dates=["quarter"])
                         preds_path = alt_path
                         break
 
         if preds_df is None:
-            st.warning(f"No prediction file found for {country}. Expected at preds_{country}_<FeatureSet>.csv in data/data-processed.")
+            st.warning(f"No prediction file found for {country}. Expected at `preds_{country}_<FeatureSet>.csv` in `{DATA_DIR}`.")
         else:
             # Ensure columns present
             if not set(["quarter", "GDP_actual", "GDP_pred"]).issubset(preds_df.columns):
@@ -460,17 +652,17 @@ with tab_prediction:
         st.divider()
         st.markdown("### Forecast (Using Best Config)")
 
-        if run:
+        if run and chosen_feature_set and winner_model:
             try:
                 # Build the modeling dataframe for the selected country + feature set
-                country_df, used_feats = load_country_model_df(country, feature_set_label)
+                country_df, used_feats = load_country_model_df(country, chosen_feature_set)
                 if country_df.empty or "GDP" not in country_df.columns:
                     st.warning("Modeling data not available or GDP column missing. Check data/data-processed/clean_quarterly.csv.")
                 else:
                     df_fore = generate_forecast(
                         model_name=winner_model,
                         country_df=country_df,
-                        feature_set_label=feature_set_label,
+                        feature_set_label=chosen_feature_set,
                         future_quarters=horizon
                     )
 
@@ -497,14 +689,16 @@ with tab_prediction:
                     st.altair_chart(line, use_container_width=True)
 
                     with st.expander("Details", expanded=False):
-                        st.write(f"Winner model: **{winner_model}** · Feature set: **{feature_set_label}**")
+                        st.write(f"Winner model: **{winner_model}** · Feature set: **{chosen_feature_set}**")
                         st.write("Features used:", used_feats)
                         st.dataframe(df_fore, use_container_width=True)
 
             except Exception as e:
                 st.error(f"Forecast failed: {e}")
+        elif run:
+            st.info("Please run a prediction first to generate forecast data.")
         else:
-            st.caption("Set a horizon and click **Run** to produce future quarters.")
+            st.caption("Set a horizon and click **Run Prediction** to produce future quarters.")
                 
     
 
@@ -520,7 +714,7 @@ with tab_features:
     )
     
     # Load and process feature importance data for selected country
-    importance_path = Path("data") / "data-processed" / f"importance_{country}_{features_type}.csv"
+    importance_path = DATA_DIR / f"importance_{country}_{features_type}.csv"
     try:
         importance_df = pd.read_csv(importance_path)
         
