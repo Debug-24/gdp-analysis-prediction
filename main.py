@@ -230,7 +230,6 @@ if middle.button("Launch Dashboard"):
 
 # ---------------- Features ----------------
 st.markdown("""
-<h3>Why this tool?</h3>
 <div class="grid">
   <div class="card">
     <h4>Interactive Trends</h4>
