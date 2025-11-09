@@ -7,6 +7,8 @@ from datetime import date
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from data_utils import filter_data
+import plotly.graph_objects as go
 import altair as alt
 import glob
 import re
@@ -295,23 +297,6 @@ def load_dataset(which: str) -> pd.DataFrame:
     df = df.dropna(subset=["country", "year", "gross_domestic_product"])
     return df
 
-# ---------- Helper functions  ----------
-def get_country_options():
-
-    return [
-        "United States","Canada", "Spain", "South Korea","Italy","Türkiye","India","Chile","Australia",
-        "Colombia","Hungary","France","Sweden","United Kingdom","Poland", "Germany", "Mexico", "Israel"
-    ]
-
-# Demo to keep charts working
-def make_demo_df(start_year: int, end_year: int, seed: int = 7) -> pd.DataFrame:
-    years = list(range(start_year, end_year + 1))
-    rng = np.random.default_rng(seed)
-    base = np.linspace(1000, 2000, len(years)) + rng.normal(0, 50, len(years)).cumsum()
-    return pd.DataFrame({"Year": years, "GDP (billions, demo)": np.round(base, 2)})
-
-# ---------- Sidebar : Data & Controls ----------
-# Dataset switcher -  Optional (?)
 # ---------- Sidebar : Data & Controls ----------
 with st.sidebar:
     st.header("Data Source")
@@ -326,14 +311,14 @@ with st.sidebar:
     )
 
     st.header("Filters")
-    if dataset.startswith("Multi-country"):
-        country = st.selectbox("Country", [
-            "United States","Canada","Spain","South Korea","Italy","Türkiye","India","Chile","Australia",
-            "Colombia","Hungary","France","Sweden","United Kingdom","Poland","Germany","Mexico","Israel"
-        ], index=0)
-    else:
-        country = "United States"
-        st.text_input("Country", value=country, disabled=True)
+    country = st.selectbox("Country", [
+        "Australia", "Austria", "Belgium", "Bulgaria", "Canada", "Chile", "Colombia",
+        "Costa Rica", "Croatia", "Czechia", "Denmark", "Estonia", "Finland", "France",
+        "Germany", "Greece", "Hungary", "Iceland", "Ireland", "Israel", "Italy", "Japan",
+        "Korea", "Latvia", "Lithuania", "Luxembourg", "Netherlands", "Norway", "Poland",
+        "Portugal", "Slovak Republic", "Slovenia", "Spain", "Sweden", "Türkiye",
+        "United Kingdom", "United States"
+    ], index=0)
 
     year_min, year_max_default = 1990, date.today().year
     years = st.slider("Timeline (Years)",
