@@ -259,24 +259,15 @@ load_css()
 
 # Updated paths to use ROOT variable (file is now in pages/ directory)
 DATA_RAW_DIR = ROOT / "data" / "data-raw"
-MULTI_PATH = DATA_RAW_DIR / "gdp_dataset_for_ml.csv"
-USONLY_PATH = DATA_RAW_DIR / "us_only_data.csv"
-USPRED_PATH = DATA_RAW_DIR / "us_gdp_predictors.csv"
+DATASET_PATH = DATA_DIR / "gdp_dataset_for_ml.csv"
+
 
 # ---------- Load Data ----------
 
 @st.cache_data(show_spinner=False)
-def load_dataset(which: str) -> pd.DataFrame:
-    if which == "multi":
-        if not MULTI_PATH.exists():
-            st.warning(f"File not found: {MULTI_PATH}")
-            return pd.DataFrame()
-        df = pd.read_csv(MULTI_PATH)
-    else:
-        if not USONLY_PATH.exists():
-            st.warning(f"File not found: {USONLY_PATH}")
-            return pd.DataFrame()
-        df = pd.read_csv(USONLY_PATH)
+def load_dataset() -> pd.DataFrame:
+    """Load and preprocess the GDP dataset"""
+    df = pd.read_csv(DATASET_PATH)
 
     # Parse quarter column
     q = df["quarter"].astype(str)
@@ -300,15 +291,7 @@ def load_dataset(which: str) -> pd.DataFrame:
 # ---------- Sidebar : Data & Controls ----------
 with st.sidebar:
     st.header("Data Source")
-    dataset = st.radio(
-        "Choose dataset",
-        [
-            "Multi-country GDP",
-            "US-only GDP ",
-            "US GDP + Predictors "
-        ],
-        index=0
-    )
+    st.info("Multi-country GDP Dataset (gdp_dataset_for_ml.csv)")
 
     st.header("Filters")
     country = st.selectbox("Country", [
@@ -326,7 +309,15 @@ with st.sidebar:
                       max_value=year_max_default,
                       value=(2010, year_max_default))
 
-    st.header("Model (From Pipeline Summary)")
+    st.header("Forecast")
+    horizon = st.slider("Forecast quarters", 1, 20, 8)   
+
+    feature_set_choice = st.selectbox(
+        "Features Set to display",
+        ["Auto (best)", "Traditional", "Enhanced"],
+        index=0
+    )
+
     summary_df = load_summary(SUMMARY_PATH)
     best = pick_best_config(summary_df, country)
 
@@ -340,15 +331,6 @@ with st.sidebar:
         winner_model = st.selectbox("Model", ["RandomForest", "Ridge", "Linear"], index=0)
 
     model_label = f"{feature_set_label} · {winner_model}"
-
-    st.header("Forecast")
-    horizon = st.slider("Forecast quarters", 1, 20, 8)   
-
-    feature_set_choice = st.selectbox(
-        "Features Set to display",
-        ["Auto (best)", "Traditional", "Enhanced"],
-        index=0
-    )
 
     run = st.button("Run Prediction")
 
@@ -475,7 +457,7 @@ with tab_prediction:
                     st.metric("Feature set", f"{chosen_feature_set}" if chosen_feature_set else "N/A")
                 with k3:
                     st.metric("RMSE", f"{chosen_rmse:.2f}" if chosen_rmse is not None else "N/A")
-                    
+
         #------------Forecast Chart-----------
         st.divider()
         st.markdown("### Forecast (Using Best Config)")
