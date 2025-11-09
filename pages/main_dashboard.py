@@ -324,7 +324,7 @@ with st.sidebar:
     if best:
         feature_set_label = best.get("feature_set", "Enhanced")              # "Enhanced" or "Traditional"
         winner_model = best.get("winner_model", "RandomForest")              # "Linear" | "Ridge" | "RandomForest"
-        st.success(f"Best Model: {feature_set_label} · {winner_model}")
+        st.success(f"Best Set: {feature_set_label}")
     else:
         st.warning("summary_metrics.csv didn't have a row for this country. Choose manually.")
         feature_set_label = st.selectbox("Feature Set", ["Enhanced", "Traditional"], index=0)
@@ -345,8 +345,6 @@ with c1:
     st.metric("Selected Country", country)
 with c2:
     st.metric("Years", f"{years[0]}–{years[1]}")
-with c3:
-    st.metric("Model", model_label)
 
 st.divider()
 
@@ -358,7 +356,7 @@ with tab_prediction:
     st.subheader("Prediction")
     
     if not run:
-        st.info("**Please select a country from the sidebar and click 'Run Prediction' to see the GDP prediction results and visualization.**")
+        st.info("**Please select a country from the sidebar and click 'Run Prediction' to see the GDP prediction and forecast results.**")
     else:
         st.success(f"Generating prediction chart for {country} on {years[0]}–{years[1]}.")
 
