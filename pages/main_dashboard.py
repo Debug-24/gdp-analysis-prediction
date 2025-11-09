@@ -351,7 +351,7 @@ with c3:
 st.divider()
 
 # ---------- Tabs ----------
-tab_prediction, tab_model, tab_data = st.tabs(["Prediction", "Model Output", "Data"])
+tab_prediction, tab_features, tab_data = st.tabs(["Prediction", "Features Ranked", "Data"])
 
 # Prediction Tab
 with tab_prediction:
@@ -510,113 +510,79 @@ with tab_prediction:
                 
     
 
-# --Model Output Tab
-with tab_model:
-    st.subheader(f"Model Output — {country} · {model_label}")
-
-    # -------- Summary Metrics Table --------
-    summary_df = load_summary(SUMMARY_PATH)
-    with st.expander("Summary Metrics", expanded=True):
-        if summary_df.empty:
-            st.info("summary_metrics.csv not found.")
-        else:
-            if "country" in summary_df.columns:
-                show_df = summary_df[summary_df["country"] == country]
-            else:
-                show_df = summary_df
-            st.dataframe(show_df, use_container_width=True)
-
-    st.divider()
-
-    # -------- Feature Importance Chart --------
-    st.markdown("### Feature Importance (Permutation)")
-    imp_df = load_importance(country, feature_set_label)
-    if imp_df.empty:
-        st.info(f"No importance file found for {country} - {feature_set_label}")
-    else:
-        top_k = st.slider("Top features to display", 5, 30, 10)
-        plot_df = imp_df.sort_values("importance", ascending=False).head(top_k)
-
-        friendly_names = {
-            "grossfixedcapitalformation": "Investment",
-            "fixedcapitalformation": "Investment",
-            "gfcf": "Investment",
-            "investment": "Investment",
-
-            "tradebalance": "Trade Balance",
-            "consumerpriceindex": "CPI",
-            "cpi": "CPI",
-
-            "unemploymentrate": "Unemployment",
-            "unemployment": "Unemployment",
-
-            "consumption": "Consumption",
-            "governmentexpenditure": "Government Spending",
-            "governmentspending": "Government Spending",
-            "government_spending": "Government Spending",
-            "exports": "Exports",
-            "imports": "Imports",
-        }
-
-        # Normalize a key for lookup, then map to friendly label
-        plot_df["__key"] = (
-            plot_df["feature"]
-            .astype(str)
-            .str.replace(r"[\s_]+", "", regex=True)
-            .str.lower()
-        )
-        plot_df["feature_ui"] = plot_df["__key"].map(friendly_names).fillna(plot_df["feature"])
-
-        #For labels not to get cut
-        row_height = 40  # maybe 36–44 for tighter
-        chart_height = max(row_height * len(plot_df), 200)
-        chart = (
-            alt.Chart(plot_df)
-            .mark_bar()
-            .encode(
-                x=alt.X("importance:Q", title="Importance"),
-                y=alt.Y("feature_ui:N", sort='-x', title="Feature", axis=alt.Axis(labelLimit=220)),
-                tooltip=["feature_ui:N", "importance:Q"]
-        )
-    .properties(height=chart_height)
-)
+# Features Ranked Tab
+with tab_features:
+    st.subheader("Feature Importance Analysis")
+    
+    # Control for Traditional vs Enhanced features
+    features_type = st.radio(
+        "Feature Set Type",
+        ["Traditional", "Enhanced"],
+        horizontal=True
+    )
+    
+    # Load and process feature importance data for selected country
+    importance_path = Path("data") / "data-processed" / f"importance_{country}_{features_type}.csv"
+    try:
+        importance_df = pd.read_csv(importance_path)
         
-        st.altair_chart(chart, use_container_width=True)
-
-    st.divider()
-    
-
-    # -------- Predictions vs Actual Chart --------
-    st.markdown("### Predictions vs Actual")
-
-    # UNPACK: load_preds returns (df, time_col)
-    preds_raw, _ = load_preds(country, feature_set_label)
-
-    # Standardize to columns t, y_true, y_pred
-    preds_df_std = standardize_preds_df(preds_raw)
-
-    if preds_df_std.empty:
-        st.info(f"No prediction file found or missing columns for {country} - {feature_set_label}")
-    else:
-        long_df = preds_df_std.melt(
-            id_vars=["t"], value_vars=["y_true", "y_pred"],
-            var_name="series", value_name="value"
-        )
-        line = (
-            alt.Chart(long_df)
-            .mark_line(point=True)
-            .encode(
-                x=alt.X("t:O", title="Time"),
-                y=alt.Y("value:Q", title="GDP Value"),
-                color="series:N",
-                tooltip=["t", "series", "value"]
+        # Ensure we have feature and importance columns
+        if not set(["feature", "importance"]).issubset(importance_df.columns):
+            st.error(f"Invalid columns in importance file. Expected 'feature' and 'importance', got: {list(importance_df.columns)}")
+        else:
+            # Sort importance by descending order
+            importance_df = importance_df.sort_values("importance", ascending=True)
+            
+            # Create horizontal bar chart with color coding
+            fig = go.Figure()
+            colors = ['#d73027' if x < 0 else '#1a9850' for x in importance_df['importance']]
+            
+            fig.add_trace(go.Bar(
+                x=importance_df["importance"],
+                y=importance_df["feature"],
+                orientation="h",
+                marker_color=colors,
+                hovertemplate="<b>%{y}</b><br>Importance: %{x:.4f}<extra></extra>"
+            ))
+            
+            fig.update_layout(
+                title=f"Feature Importance Ranking for {country} ({features_type} Features)",
+                xaxis_title="Importance Score",
+                yaxis_title="Feature",
+                height=max(400, len(importance_df) * 30),  
+                margin=dict(l=200),  
+                showlegend=False,
+                # color-coding
+                annotations=[
+                    dict(
+                        text="Green = Positive Impact | Red = Negative Impact",
+                        xref="paper", yref="paper",
+                        x=0, y=1.05,
+                        showarrow=False,
+                        font=dict(size=10),
+                        xanchor="left"
+                    )
+                ]
             )
-            .properties(height=380)
-        )
-        st.altair_chart(line, use_container_width=True)
-    
-    
 
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Features data table
+            st.subheader("Feature Importance Scores")
+            st.dataframe(
+                importance_df,
+                column_config={
+                    "feature": "Feature Name",
+                    "importance": st.column_config.NumberColumn(
+                        "Importance Score",
+                        format="%.4f",
+                    )
+                },
+                hide_index=True
+            )
+    except FileNotFoundError:
+        st.warning(f"No feature importance data found for {country} with {features_type} features.")
+    
 
 # --Data Tab
 with tab_data:
