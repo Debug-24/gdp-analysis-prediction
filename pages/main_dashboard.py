@@ -45,7 +45,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 # Import forecast function from your ML pipeline
-from scripts.models.predict import generate_forecast, TRADITIONAL, ENHANCED
+from src.models.predict import generate_forecast, TRADITIONAL, ENHANCED
 
 DATA_DIR = ROOT / "data" / "data-processed"
 
@@ -255,17 +255,25 @@ load_css()
 
 # ---------- File locations ----------
 
-MULTI_PATH = Path ("../gdp_dataset_for_ml.csv")
-USONLY_PATH = Path ("../us_only_data.csv")
-USPRED_PATH = Path("../us_gdp_predictors.csv")
+# Updated paths to use ROOT variable (file is now in pages/ directory)
+DATA_RAW_DIR = ROOT / "data" / "data-raw"
+MULTI_PATH = DATA_RAW_DIR / "gdp_dataset_for_ml.csv"
+USONLY_PATH = DATA_RAW_DIR / "us_only_data.csv"
+USPRED_PATH = DATA_RAW_DIR / "us_gdp_predictors.csv"
 
 # ---------- Load Data ----------
 
 @st.cache_data(show_spinner=False)
 def load_dataset(which: str) -> pd.DataFrame:
     if which == "multi":
+        if not MULTI_PATH.exists():
+            st.warning(f"File not found: {MULTI_PATH}")
+            return pd.DataFrame()
         df = pd.read_csv(MULTI_PATH)
     else:
+        if not USONLY_PATH.exists():
+            st.warning(f"File not found: {USONLY_PATH}")
+            return pd.DataFrame()
         df = pd.read_csv(USONLY_PATH)
 
     # Parse quarter column
@@ -342,7 +350,7 @@ with st.sidebar:
         winner_model = best.get("winner_model", "RandomForest")              # "Linear" | "Ridge" | "RandomForest"
         st.success(f"Best Model: {feature_set_label} · {winner_model}")
     else:
-        st.warning("summary_metrics.csv didn’t have a row for this country. Choose manually.")
+        st.warning("summary_metrics.csv didn't have a row for this country. Choose manually.")
         feature_set_label = st.selectbox("Feature Set", ["Enhanced", "Traditional"], index=0)
         winner_model = st.selectbox("Model", ["RandomForest", "Ridge", "Linear"], index=0)
 
@@ -596,3 +604,4 @@ st.markdown(
     ''',
     unsafe_allow_html=True
 )
+
