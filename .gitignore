@@ -1,6 +1,6 @@
-"venv/" 
-"__pycache__/" 
-"data/" 
-"models/" 
-"reports/" 
-"notebooks/" 
+.venv/
+__pycache__/
+data/**/*.csv
+!data/data-raw/**/*.csv
+reports/
+notebooks/
