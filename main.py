@@ -1,196 +1,377 @@
+"""
+Landing Page — GDP Predictor Tool
 
 """
-GDP Predictor Tool — UI Shell (Streamlit)
-Description: Layout-only shell with sidebar inputs (country dropdown, timeline slider),
-metric cards, and tabs. Only included DEMO data.
-"""
-import streamlit as st
-from datetime import date
-import pandas as pd
-import numpy as np
 from pathlib import Path
-import altair as alt
+import base64
+import mimetypes
+import streamlit as st
 
+st.set_page_config(page_title="GDP Predictor Tool", page_icon="🌍", layout="wide", initial_sidebar_state="collapsed")
 
+st.markdown("""
+<style>
+/* Hide the sidebar + its collapse handle */
+section[data-testid="stSidebar"] { display: none !important; }
+button[kind="header"] { display: none !important; }  /* mobile sidebar toggle */
 
+/* Expand the main area to full width */
+div[data-testid="stAppViewContainer"] { margin-left: 0 !important; }
+</style>
+""", unsafe_allow_html=True)
 
-# ---------- Page config ----------
-st.set_page_config(
-    page_title="GDP Predictor Tool",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# ---------- Full Globe as BG ----------
 
-# ---------- File locations ----------
+BG_FILE = Path("assets/globe.jpg")  # <-- change to your file: .jpg/.png/.svg
 
-MULTI_PATH = Path ("gdp_dataset_for_ml.csv")
-USONLY_PATH = Path ("us_only_data.csv")
-USPRED_PATH = Path("us_gdp_predictors.csv")
+if BG_FILE.exists():
+    mime, _ = mimetypes.guess_type(BG_FILE.name)
+    if mime is None:
+        # fallback based on extension
+        ext = BG_FILE.suffix.lower()
+        mime = "image/svg+xml" if ext == ".svg" else "image/png"
 
-# ---------- Load Data ----------
+    b64 = base64.b64encode(BG_FILE.read_bytes()).decode("utf-8")
 
-# You can replace - included for demo/layout
-@st.cache_data(show_spinner=False)
-def load_dataset(which: str) -> pd.DataFrame:
-    if which == "multi":
-        df = pd.read_csv(MULTI_PATH)
-    else:
-        df = pd.read_csv(USONLY_PATH)
-
-    # Parse quarter column
-    q = df["quarter"].astype(str)
-    try:
-        dt = pd.to_datetime(q, errors="raise")
-    except Exception:
-        period = pd.PeriodIndex(q, freq="Q")
-        dt = period.to_timestamp(how="end")
-
-    # Add year column
-    df = df.assign(year=dt.dt.year)
-
-    # Clean up types
-    df["country"] = df["country"].astype(str)
-    df["gross_domestic_product"] = pd.to_numeric(df["gross_domestic_product"], errors="coerce")
-
-    # Drop bad rows
-    df = df.dropna(subset=["country", "year", "gross_domestic_product"])
-    return df
-
-# ---------- Helper functions  ----------
-def get_country_options():
-
-    return [
-        "United States","Canada", "Spain", "South Korea","Italy","Turkey","India","Chile","Australia",
-        "Colombia","Hungary","France","Sweden","United Kingdom","Poland", "Germany", "Mexico", "Israel"
-    ]
-
-# Demo to keep charts working
-def make_demo_df(start_year: int, end_year: int, seed: int = 7) -> pd.DataFrame:
-    years = list(range(start_year, end_year + 1))
-    rng = np.random.default_rng(seed)
-    base = np.linspace(1000, 2000, len(years)) + rng.normal(0, 50, len(years)).cumsum()
-    return pd.DataFrame({"Year": years, "GDP (billions, demo)": np.round(base, 2)})
-
-# ---------- Sidebar : Data & Controls ----------
-# Dataset switcher -  Optional (?)
-with st.sidebar:
-    st.header("Data Source")
-    dataset = st.radio(
-        "Choose dataset",
-        [
-            "Multi-country GDP (gdp_dataset_for_ml.csv)",
-            "US-only GDP (us_only_data.csv)",
-            "US GDP + Predictors (us_gdp_predictors.csv)"
-        ],
-        index=0
+# ---------- Full-page background ----------
+    st.markdown(
+        f"""
+            <style>
+            html, body, .stApp, [data-testid="stAppViewContainer"] {{
+                background: transparent !important;
+            }}
+            [data-testid="stHeader"], [data-testid="stToolbar"] {{
+                background: rgba(255,255,255,0) !important;
+            }}
+            [data-testid="stSidebar"] {{
+                background: rgba(255,255,255,0.85) !important;
+                backdrop-filter: blur(2px);
+            }}
+            #bg-wrap {{
+              position: fixed;
+              inset: 0;
+              z-index: -1;
+              background: url("data:{mime};base64,{b64}") no-repeat center center fixed;
+              background-size: cover;
+            }}
+            </style>
+            <div id="bg-wrap"></div>
+            """,
+        unsafe_allow_html=True
     )
 
-    st.header("Filters")
-    if dataset.startswith("Multi-country"):
-        country = st.selectbox("Country", [
-            "United States","Canada","Spain","South Korea","Italy","Turkey","India","Chile","Australia",
-            "Colombia","Hungary","France","Sweden","United Kingdom","Poland","Germany","Mexico","Israel"
-        ], index=0)
-    else:
-        country = "United States"
-        st.text_input("Country", value=country, disabled=True)
-
-    year_min, year_max_default = 1990, date.today().year
-    years = st.slider("Timeline (Years)", min_value=year_min, max_value=year_max_default, value=(2010, year_max_default))
-
-# Optional - can be removed
-    st.header("Transformations")
-    norm_type = st.selectbox("Normalize", ["None", "Per capita (needs population)", "Real GDP (deflate)"], index=0)
-    calc_growth = st.checkbox("Show YoY growth %", value=False)
-
-    st.header("Model")
-    model_choice = st.selectbox(
-        "Model",
-        ["— Select —","Forecasting Model 1","Forecasting Model 2","Forecasting Model 3"],
-        index=0
+# ---------- Add dark overlay (Overall on top of the globe) ----------
+    st.markdown(
+        """
+        <style>
+        #overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35); /* adjust darkness */
+            z-index: -1;
+        }
+        </style>
+        <div id="overlay"></div>
+        """,
+        unsafe_allow_html=True
     )
 
-
-    if dataset.startswith("US GDP + Predictors"):
-        use_predictors = st.checkbox("Use predictor variables (X)", value=True)
-        selected_predictors = st.multiselect(
-            "Select predictors",
-            ["unemployment_rate", "cpi_or_inflation", "interest_rate"],
-            default=["unemployment_rate", "cpi_or_inflation"]
-        )
-
-    run = st.button("Run Prediction")
-
-# ---------- Header ----------
-st.title("GDP Predictor Tool")
+else:
+    st.info("Background image not found. Put it at assets/globe.jpg (or update BG_FILE).")
 
 
-# ---------- KPI cards ----------
-c1, c2, c3 = st.columns(3)
-with c1:
-    st.metric("Selected Country", country)
-with c2:
-    st.metric("Years", f"{years[0]}–{years[1]}")
-with c3:
-    st.metric("Model", model_choice if model_choice != "— Select —" else "TBD")
+# ---------------- CSS Styles  ----------------
+st.markdown("""
+<style>
+/* Center the hero content and add breathing space */
+.hero {
+  max-width: 800px;
+  margin: 0 auto;
+  padding-top: 2rem;         /* small, even spacing at top */
+  padding-bottom: 1rem;
+  text-align: center;        
+  display: flex;
+  flex-direction: column;
+  justify-content: center;   
+  align-items: center;
+}
+.hero h1 {
+  font-size: clamp(2rem, 6vw, 3.25rem);
+  line-height: 1.1;
+  margin-bottom: 0.25rem;
+  font-weight: 800;
+}
+.hero p.lead {
+  font-size: clamp(1rem, 2.6vw, 1.25rem);
+  color: #374151;
+  margin-bottom: 1.25rem;
+}
+.hero img {
+  width: 100%;
+  height: auto;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.08);
+}
 
-st.divider()
 
-# ---------- Tabs ----------
-tab_overview, tab_model, tab_data = st.tabs(["Overview", "Model Output", "Data"])
 
-# Overview Tab
-with tab_overview:
-    st.subheader("Trend Preview")
-    demo = make_demo_df(*years)
+/* CTA buttons */
+.cta { margin: 1.25rem 0 0 }
+.cta .row { display:flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.cta a, .cta button {
+  border-radius: 9999px !important;
+  padding: .6rem 1.1rem !important;
+  font-weight: 600 !important;
+}
+/* Theme harmony with green primary */
+:root {
+  --primary: #174734;
+  --tint: #fef4eb;
+}
+a[kind="primary"], .stButton>button[kind="primary"] { background: var(--primary); color: #fff; }
+a[kind="secondary"], .stButton>button[kind="secondary"] { background: var(--tint); color: #111827; border: 1px solid rgba(0,0,0,.06); }
+</style>
+""", unsafe_allow_html=True)
 
-    # Casting Year to string so Streamlit doesn’t add commas
-    demo["Year"] = demo["Year"].astype(str)
+# ---------- Background Globe ----------
+globe_path = Path("assets/globe.jpg")
 
-    chart = alt.Chart(demo).mark_line(color="#174734", strokeWidth=3).encode(
-        x=alt.X("Year", title="Year"),
-        y=alt.Y("GDP (billions, demo)", title="GDP (Billions)")
+if globe_path.exists():
+    # Set the background via inline CSS
+    st.markdown(
+        f"""
+        <style>
+        [data-testid="stAppViewContainer"] {{
+            background: url("{globe_path.as_posix()}") no-repeat center center fixed;
+            background-size: cover;
+        }}
+        [data-testid="stHeader"], [data-testid="stToolbar"] {{
+            background: rgba(255, 255, 255, 0); /* make Streamlit header transparent */
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
     )
+else:
+    st.info("Add a globe image to assets/ to display the background.")
 
-    st.altair_chart(chart, use_container_width=True)
-    st.warning("This is demo data for layout only. Replace with real GDP series from your datasource.")
-
-# Model Output Tab
-with tab_model:
-    st.subheader("Predictions")
-    if run and model_choice != "— Select —":
-        st.success(f"Ran {model_choice} for {country} on {years[0]}–{years[1]} (demo).")
-        #TODO: replace with real prediction results/plots
-        pred_years = list(range(years[1] - 4, years[1] + 1))
-        pred_df = pd.DataFrame({
-            "Year": [str(y) for y in pred_years],  # convert to strings
-            "Predicted GDP (demo)": np.linspace(1800, 2100, 5)
-        })
-        bar_chart = alt.Chart(pred_df).mark_bar(color="#e87503").encode(
-            x=alt.X("Year", title="Year"),
-            y=alt.Y("Predicted GDP (demo)", title="Predicted GDP (Billions)")
-        )
-
-        st.altair_chart(bar_chart, use_container_width=True)
-
-    else:
-        st.warning("Click **Run Prediction** after selecting a model to see results.")
-
-# Data Tab
-with tab_data:
-    st.subheader("Data Table (Demo)")
-    st.dataframe(demo, use_container_width=True)
-    st.info("Replace this table with your datasource ")
-
-# ---------- Footer ----------
-st.divider()
+# ---------------- Hero/Hero Box (around GDP P.T ----------------
 st.markdown(
-    '''
-    <small>
-    <b>Notes / TODO:</b><br>
-    • Add caching with <code>@st.cache_data</code> for data retrieval<br>
-    </small>
-    ''',
+    """
+    <div class="hero-box">
+      <h1>GDP Predictor Tool</h1>
+      <p>Forecast smarter. Plan better. See what’s next.</p>
+    </div>
+
+    <style>
+        .hero-box {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+            background: rgba(208, 224, 204, 0.55);
+            border-radius: 16px;
+            padding: 1.1rem 1.6rem;           
+            box-shadow: 0 0 25px rgba(23, 71, 52, 0.25);
+            backdrop-filter: blur(6px);
+            transition: all 0.3s ease-in-out;
+        }
+        .hero-box:hover {
+            box-shadow: 0 0 35px rgba(23, 71, 52, 0.35);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            transform: scale(1.02);
+        }
+        .hero-box h1 {
+            margin-bottom: 0rem;               
+            line-height: 1.1;
+            color: #174734;
+            font-weight: 800;
+        }
+        .hero-box p {
+            margin-top: 0;                        
+            color: #374151;
+            font-size: 1.1rem;
+            line-height: 1.35;
+        }
+    </style>
+    """,
     unsafe_allow_html=True
 )
+#------CTA Button + Effect-----
+
+left, middle, right = st.columns([1.1, 0.4, 1])
+st.markdown("""
+<style>
+            
+.stButton>button {
+    background: #d97706 !important;               /* darker orange */
+    color:#fff !important;
+    padding:12px 22px;
+    border-radius:9999px;
+    font-weight:600;
+    margin-top:40px;
+    text-decoration:none;
+    display:inline-block;
+    box-shadow:0 0 15px rgba(217,119,6,.55);  /* glow */
+    backdrop-filter: blur(6px);
+    transition: all .25s ease;
+}
+.stButton>button:hover {
+    background:#f59e0b;              
+    box-shadow:0 0 26px rgba(245,158,11,.85);
+    transform: scale(1.04);
+}
+</style>
+""", unsafe_allow_html=True)
+
+if middle.button("Launch Dashboard"):
+    st.switch_page("pages/main_dashboard.py")
+
+
+# ---------------- Features ----------------
+st.markdown("""
+<div class="grid">
+  <div class="card">
+    <h4>Interactive Trends</h4>
+    <p>Slice by country and time. Visualize GDP with smooth, responsive charts.</p>
+  </div>
+
+  <div class="card">
+    <h4>ML Predictions</h4>
+    <p>Experiment with regression models and evaluate metrics (R², MAE, RMSE).</p>
+  </div>
+
+  <div class="card">
+    <h4>Clean Data Flow</h4>
+    <p>Simple CSV loading, caching, and consistent filters across tabs.</p>
+  </div>
+
+  <div class="card">
+    <h4>Transparent Methods</h4>
+    <p>Learn the assumptions and data sources on the Methodology page.</p>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ---------------- Feature Card Styling ----------------
+st.markdown(
+    """
+    <style>
+    
+        h3 {
+            color: rgba(255,255,255,0.95);
+            text-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+        }
+      /* --- 2×2 layout on desktop, 1 column on mobile --- */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));  
+        gap: 1.2rem;                                    /* spacing between cards */
+        max-width: 960px;
+        margin: 1.5rem auto 3rem;           /* center the grid */
+        align-items: stretch;                     /* equal heights per row */
+      }
+
+      .card {
+        background: rgba(255, 243, 230, 0.75);
+        border-radius: 20px;
+        padding: 1.25rem 1.1rem;
+        border: 1px solid rgba(217, 119, 6, 0.10); /* faint warm border */
+        box-shadow:
+            0 4px 12px rgba(217, 119, 6, 0.08),     /* soft orange glow */
+            0 2px 6px rgba(0, 0, 0, 0.05);          /* subtle depth */
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        height: 100%;
+        transition: all 0.3s ease;
+        position: relative;
+        z-index: 2;
+        color: #1a1a1a;                           
+}
+
+      .card:hover {
+        transform: translateY(-6px);
+        background: rgba(255, 255, 255, 0.85);   /* lighter, cleaner */
+        box-shadow:
+            0 10px 25px rgba(217, 119, 6, 0.20),   /* stronger orange glow */
+            0 4px 12px rgba(0, 0, 0, 0.05);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        cursor: pointer;
+     }
+
+      .card h4 {
+        margin: 0;          
+        line-height: 1.2;
+        color: #92400e;
+        font-weight: 700;
+        font-size: 1.05rem;
+      }
+
+      .card p {
+        margin: 0;          
+        line-height: 1.35;
+        color: #4b2e05;
+        font-size: 1rem;
+      }
+
+      /* Stack to 1 column on smaller screens */
+      @media (max-width: 860px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+#---------Feature Cards + Effect ----------
+st.markdown(
+    """
+    <style>
+    /* --- Features (scoped) --- */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+      margin: 2.5rem auto 4rem;
+      max-width: 1000px;
+    }
+
+
+    .feature-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 12px 25px rgba(23, 71, 52, 0.25);
+      background: rgba(255, 255, 255, 0.9);
+      cursor: pointer;
+    }
+
+    .feature-card h4 {
+      /* ↓ this controls the space between the header and paragraph */
+      margin: 0 0 0.06rem;
+      line-height: 1.2;
+      color: #174734;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+
+    .feature-card p {
+      margin: 0;              
+      line-height: 1.35;
+      color: #374151;
+      font-size: 1rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# ---------------- Footer ----------------
+st.divider()
+st.caption("Group 44, 2025")

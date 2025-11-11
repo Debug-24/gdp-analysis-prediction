@@ -1,5 +1,11 @@
+
 .venv/
+venv/
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.vscode/
 data/**/*.csv
 !data/data-raw/**/*.csv
 reports/
