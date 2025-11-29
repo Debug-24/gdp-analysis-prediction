@@ -516,7 +516,7 @@ with st.sidebar:
     if best:
         feature_set_label = best.get("feature_set", "Enhanced")              # "Enhanced" or "Traditional"
         winner_model = best.get("winner_model", "RandomForest")              # "Linear" | "Ridge" | "RandomForest"
-        st.success(f"Best Set: {feature_set_label}")
+        st.success(f"Best Set by RSME: {feature_set_label}")
     else:
         st.warning("summary_metrics.csv didn't have a row for this country. Using default.")
         feature_set_label = "Enhanced"  # Default fallback
