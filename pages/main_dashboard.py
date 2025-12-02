@@ -495,11 +495,33 @@ with st.sidebar:
         "United Kingdom", "United States"
     ], index=0)
 
-    year_min, year_max_default = 1990, date.today().year
+    # --- Dynamic Timeline Logic ---
+    # Load the full dataset (cached) to check actual data availability
+    df_all = load_dataset()
+    
+    # Default fallback values
+    min_y = 1990
+    max_y = date.today().year
+
+    # If we have data for this country, grab the real min/max years
+    if not df_all.empty and country:
+        c_df = df_all[df_all["country"] == country]
+        if not c_df.empty:
+            min_y = int(c_df["year"].min())
+            max_y = int(c_df["year"].max())
+
+    # Determine a safe default start value (e.g., 2010, or the earliest year if data starts later)
+    default_start = 2010
+    if default_start < min_y:
+        default_start = min_y
+    if default_start > max_y:
+        default_start = min_y
+
+    # Render the slider with dynamic bounds
     years = st.slider("Timeline (Years)",
-                      min_value=year_min,
-                      max_value=year_max_default,
-                      value=(2010, year_max_default))
+                      min_value=min_y,
+                      max_value=max_y,
+                      value=(default_start, max_y))
 
     st.header("Forecast")
     horizon = st.slider("Forecast quarters", 1, 20, 8)   
