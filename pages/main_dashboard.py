@@ -510,18 +510,11 @@ with st.sidebar:
             min_y = int(c_df["year"].min())
             max_y = int(c_df["year"].max())
 
-    # Determine a safe default start value (e.g., 2010, or the earliest year if data starts later)
-    default_start = 2010
-    if default_start < min_y:
-        default_start = min_y
-    if default_start > max_y:
-        default_start = min_y
-
     # Render the slider with dynamic bounds
     years = st.slider("Timeline (Years)",
                       min_value=min_y,
                       max_value=max_y,
-                      value=(default_start, max_y))
+                      value=(min_y, max_y))
 
     st.header("Forecast")
     horizon = st.slider("Forecast quarters", 1, 20, 8)   
@@ -639,20 +632,25 @@ with tab_prediction:
                     y=plot_df["GDP_actual"],
                     mode="lines+markers",
                     name="GDP Actual",
-                    line=dict(color="#174734")
+                    line=dict(color="#174734"),
+                    # Clean tooltip: "15,222.45 Million"
+                    hovertemplate='%{y:,.2f} Million<extra></extra>' 
                 ))
                 fig.add_trace(go.Scatter(
                     x=plot_df["quarter"],
                     y=plot_df["GDP_pred"],
                     mode="lines+markers",
                     name="GDP Predicted",
-                    line=dict(color="#e87503", dash="dash")
+                    line=dict(color="#e87503", dash="dash"),
+                    # Clean tooltip: "15,222.45 Million"
+                    hovertemplate='%{y:,.2f} Million<extra></extra>'
                 ))
 
                 fig.update_layout(
                     title=f"{country}: Actual vs Predicted GDP ({chosen_feature_set if chosen_feature_set else 'unknown feature set'})",
                     xaxis_title="Date",
-                    yaxis_title="GDP (Billions)",
+                    # Correct unit label
+                    yaxis_title="GDP (Millions of National Currency)", 
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                 )
 
@@ -726,9 +724,15 @@ with tab_prediction:
                         .mark_line(point=True)
                         .encode(
                             x=alt.X("quarter:T", title="Quarter"),
-                            y=alt.Y("value:Q", title="GDP"),
+                            # Correct unit label
+                            y=alt.Y("value:Q", title="GDP (Millions of National Currency)"),
                             color="type:N",
-                            tooltip=["quarter:T", "type:N", "value:Q"]
+                            tooltip=[
+                                alt.Tooltip("quarter:T", title="Quarter", format="%Y-%m"),
+                                alt.Tooltip("type:N", title="Type"),
+                                # Clean tooltip: "15,222.45"
+                                alt.Tooltip("value:Q", title="GDP (Millions)", format=",.2f")
+                            ]
                         )
                         .properties(height=380)
                     )
