@@ -10,3 +10,5 @@ data/**/*.csv
 !data/data-raw/**/*.csv
 reports/
 notebooks/
+
+!data/data-processed/**/*.csv
