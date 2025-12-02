@@ -31,19 +31,21 @@ def train_and_eval(df_country: pd.DataFrame, features: list, model_name="Linear"
         model = RandomForestRegressor(n_estimators=300, random_state=42)
 
     model.fit(Xtr, ytr)
-    pred = model.predict(Xte)
+
+    full_pred = model.predict(X)
+    test_pred = full_pred[test_idx]
 
     p_result = permutation_importance(
         model, Xte, yte, n_repeats=10, random_state=42, n_jobs=-1)
     importance_dict = dict(zip(features, p_result.importances_mean))
 
-    mets = metrics_dict(yte, pred)
+    mets = metrics_dict(yte, test_pred)
     mets = add_adj_r2(mets, n=len(yte), p=len(features))
 
     out = pd.DataFrame({
-        "quarter": df_country.iloc[test_idx]["quarter"].values,
-        "GDP_actual": yte,
-        "GDP_pred": pred
+        "quarter": df_country["quarter"].values,
+        "GDP_actual": y,
+        "GDP_pred": full_pred
     })
 
     return {"metrics": mets, "preds": out, "model": model, "importance": importance_dict}
