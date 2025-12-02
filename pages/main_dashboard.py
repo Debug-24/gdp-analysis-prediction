@@ -637,16 +637,40 @@ with tab_prediction:
                 st.plotly_chart(fig, use_container_width=True)
 
                 # KPI / summary display
-                k1, k2, k3 = st.columns(3)
-                with k1:
-                    if winner_model:
-                        st.metric("Winning model", f"{winner_model}")
+                st.divider()
+                st.markdown("### Model Performance Comparison")
+
+                # Reload summary using the helper for consistent column names (rmse, r2)
+                metrics_df = load_summary(SUMMARY_PATH)
+
+                if not metrics_df.empty:
+                    # Filter for the current country
+                    country_metrics = metrics_df[metrics_df["country"] == country].copy()
+
+                    if not country_metrics.empty:
+                        # Sort by RMSE so the best model appears first
+                        if "rmse" in country_metrics.columns:
+                            country_metrics = country_metrics.sort_values("rmse", ascending=True)
+
+                        # Loop through each row (Traditional, Enhanced) and display them
+                        for i, row in country_metrics.iterrows():
+                            # Create 4 columns: Feature Set | Model | RMSE | R2
+                            c1, c2, c3, c4 = st.columns(4)
+
+                            c1.metric("Feature Set", row.get("feature_set", "N/A"))
+                            c2.metric("Model", row.get("winner_model", "N/A"))
+                            
+                            # Format RMSE
+                            val_rmse = row.get("rmse")
+                            c3.metric("RMSE", f"{val_rmse:.2f}" if pd.notnull(val_rmse) else "N/A")
+
+                            # Format R2
+                            val_r2 = row.get("r2")
+                            c4.metric("R²", f"{val_r2:.4f}" if pd.notnull(val_r2) else "N/A")
                     else:
-                        st.metric("Winning model", "N/A")
-                with k2:
-                    st.metric("Feature set", f"{chosen_feature_set}" if chosen_feature_set else "N/A")
-                with k3:
-                    st.metric("RMSE", f"{chosen_rmse:.2f}" if chosen_rmse is not None else "N/A")
+                        st.info(f"No detailed metrics found for {country}.")
+                else:
+                    st.warning("Summary metrics file is empty or missing.")
 
         #------------Forecast Chart-----------
         st.divider()
