@@ -310,17 +310,32 @@ def pick_best_config(summary_df: pd.DataFrame, country: str):
         return None
     df = summary_df.copy()
     df.columns = [c.lower() for c in df.columns]
-    if "country" in df.columns:
-        df = df[df["country"] == country]
-        if df.empty:
-            return None
-    if "r2" in df.columns:
-        df = df.sort_values("r2", ascending=False)
-    elif "rmse" in df.columns:
-        df = df.sort_values("rmse", ascending=True)
-    elif "mae" in df.columns:
-        df = df.sort_values("mae", ascending=True)
-    return df.iloc[0].to_dict()
+    if "country" not in df.columns:
+        return None
+    
+    # Case-insensitive country matching with whitespace stripping
+    df["country"] = df["country"].astype(str).str.strip()
+    country_clean = str(country).strip()
+    
+    # Try exact match first
+    country_df = df[df["country"] == country_clean]
+    
+    # If no exact match, try case-insensitive match
+    if country_df.empty:
+        country_df = df[df["country"].str.lower() == country_clean.lower()]
+    
+    if country_df.empty:
+        return None
+    
+    # Sort by best metric: highest R2, else lowest RMSE, else lowest MAE
+    if "r2" in country_df.columns:
+        country_df = country_df.sort_values("r2", ascending=False)
+    elif "rmse" in country_df.columns:
+        country_df = country_df.sort_values("rmse", ascending=True)
+    elif "mae" in country_df.columns:
+        country_df = country_df.sort_values("mae", ascending=True)
+    
+    return country_df.iloc[0].to_dict()
 
 def load_country_model_df(country: str, feature_set_label: str):
     """
@@ -533,7 +548,23 @@ with st.sidebar:
         winner_model = best.get("winner_model", "RandomForest")              # "Linear" | "Ridge" | "RandomForest"
         st.success(f"Best Set by RSME: {feature_set_label}")
     else:
-        st.warning("summary_metrics.csv didn't have a row for this country. Using default.")
+        # Provide more helpful debugging information
+        if summary_df.empty:
+            st.warning(f"summary_metrics.csv is empty or not found at {SUMMARY_PATH}. Using default.")
+        else:
+            # load_summary already converts columns to lowercase, so "country" is lowercase
+            country_col = "country" if "country" in summary_df.columns else None
+            if country_col:
+                available_countries = sorted(summary_df[country_col].astype(str).unique().tolist())
+                country_list = ', '.join(available_countries[:10])
+                if len(available_countries) > 10:
+                    country_list += f'... (and {len(available_countries) - 10} more)'
+                st.warning(
+                    f"summary_metrics.csv didn't have a row for '{country}'. "
+                    f"Available countries: {country_list}. Using default."
+                )
+            else:
+                st.warning(f"summary_metrics.csv doesn't have a 'country' column. Using default.")
         feature_set_label = "Enhanced"  # Default fallback
         winner_model = "RandomForest"  # Default fallback
 
